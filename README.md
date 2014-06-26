@@ -51,14 +51,16 @@ could lessen the problem, but not fix it.
 
 ### What's happening? ###
 
-Each client just sends a request then the server worker threads are
-set up so that one of them always takes a long time to process request.
+The server worker threads are set up so that one of the workers
+always takes a long time to process requests. Then the client
+spews 100 requests and measures how long they take to process.
 
 In a perfect load balancing system the requests should be sent to the
-server that is the least busy. Instead what's happening here is that
-the round-robin algorithm sends all the requests evenly to all the
-worker threads and then just sits there twiddling its thumbs before
-it's time to process the replies and send them back to the requesters.
+server (or worker thread in this case) that is the least busy. Instead
+what's happening here is that the round-robin algorithm sends all the
+requests evenly to all the worker threads and then just sits there
+twiddling its thumbs before it's time to process the replies and send
+them back to the requesters.
 
 For a networked load balancer without any additional information this
 behavior might make sense. For one that actually has perfect information
