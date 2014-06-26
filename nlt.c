@@ -106,9 +106,19 @@ struct cw {
 	char *req;
 };
 
+pthread_mutex_t count_mtx = PTHREAD_MUTEX_INITIALIZER;
+int slow_cnt;
+int fast_cnt;
+double slow_time;
+double fast_time;
+
 #define THUNDERING_HERD
 #ifdef THUNDERING_HERD
-/* Just for fun, we want all our clients to start at the "same time". This isn't strictly necessary, but it's fun. This code can be disabled. */
+/*
+ * Just for fun, we make the clients send the messages at the "same
+ * time". This isn't strictly necessary, but it's fun. This code can
+ * be safely disabled if something doesn't implement pthread_barrier.
+ */
 pthread_barrier_t thundering_herd;
 #endif
 
@@ -141,10 +151,19 @@ client_worker(void *v)
 		e.tv_sec--;
 	}
 
+	double t = ((double)e.tv_sec * 1000000000.0 + (double)e.tv_nsec) / 1000000000.0;
+
+	pthread_mutex_lock(&count_mtx);
 	if (e.tv_sec) {
-		double t = ((double)e.tv_sec * 1000000000.0 + (double)e.tv_nsec) / 1000000000.0;
 		printf("client req took %f\n", t);
+		slow_time += t;
+		slow_cnt++;
+		/* __sync_fetch_and_add(&slow_time, t); doesn't work, so we need a lock. */
+	} else {
+		fast_time += t;
+		fast_cnt++;
 	}
+	pthread_mutex_unlock(&count_mtx);
 
 	if (debug) printf("client: received reply: [%.*s]\n", replen, repbuf);
 	nn_freemsg(repbuf);
@@ -185,6 +204,9 @@ client(int argc, char **argv)
 		void *r;
 		pthread_join(thr[i], &r);
 	}
+
+	printf("slow requests: %d, average time: %f, total: %f\n", slow_cnt, slow_time / (double)slow_cnt, slow_time);
+	printf("fast requests: %d, average time: %f, total: %f\n", fast_cnt, fast_time / (double)fast_cnt, fast_time);
 
 	return 0;
 }
