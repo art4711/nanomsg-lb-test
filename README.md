@@ -49,15 +49,6 @@ of the test code showed some unacceptably bad load balancing within
 the `inproc:` protocol and only a very brutal and crude workaround
 could lessen the problem, but not fix it.
 
-The workaround is to simply reduce the receive buffer on the worker
-threads to one byte. Somehow this makes the slow worker thread queue
-process three requests (first one I understand it's the one it starts
-processing immediately, second one I understand, it's the one that's
-queued in the "exactly one message may be buffered in addition to the
-data in the receive buffer", but where does the third come from? It
-won't fit in the buffer, because the request is three bytes and the
-receive buffer is set to 1. Is it queued in the send buffer?
-
 ### What's happening? ###
 
 Each client just sends a request then the server worker threads are
@@ -73,7 +64,23 @@ For a networked load balancer without any additional information this
 behavior might make sense. For one that actually has perfect information
 like "inproc:" this is crazy. We end up with 4 server threads processing
 their requests in a few microseconds, then the last server thread takes
-2 seconds each to process each request. 
+2 seconds each to process each request.
+
+A perfect load balancer would give us 99 fast requests averaging a few
+microseconds each and one that took two seconds. Instead we get 80
+fast requests averaging a few microseconds each and 20 that average 21
+seconds each (first takes 2, second takes 4, ... last takes 40). The
+total time we've been blocking the client(s) is 418 seconds more than
+we should have. This is not good.
+
+The workaround is to simply reduce the receive buffer on the worker
+threads to one byte. Somehow this makes the slow worker thread queue
+process three requests (first one I understand it's the one it starts
+processing immediately, second one I understand, it's the one that's
+queued in the "exactly one message may be buffered in addition to the
+data in the receive buffer", but where does the third come from? It
+won't fit in the buffer, because the request is three bytes and the
+receive buffer is set to 1. Is it queued in the send buffer?
 
 ### What did I miss? ###
 
@@ -136,7 +143,7 @@ hit this situation several times per day. Strictly speaking this isn't
 necessarily just the requests that are expensive, but can also be caused
 by the paging behavior of the machines they run on since we're processing
 a lot of data mapped with `mmap` and the operating system can sometimes
-decide that some random 
+evict random pages that we actually need.
 
 We can't handle this with client side timeouts because the client
 rarely knows which requests will be CPU melters and which ones will be
