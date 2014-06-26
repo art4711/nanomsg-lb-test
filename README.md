@@ -117,9 +117,11 @@ either don't understand, haven't found anywhere in the documentation
 or isn't there and is just mentioned in the blog post as a side note
 without explaining.
 
-"...if a peer is dead, or it is busy at the moment, it's removed..."
-"...after all the priority 1 peers are dead, disconnected or busy..."
-"...unless all of them are dead, busy or disconnected..."
+>"...if a peer is dead, or it is busy at the moment, it's removed..."
+
+>"...after all the priority 1 peers are dead, disconnected or busy..."
+
+>"...unless all of them are dead, busy or disconnected..."
 
 What does "busy" mean? I haven't found anywhere in the API
 documentation any way to signal that a service is busy.
