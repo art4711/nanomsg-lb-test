@@ -129,44 +129,48 @@ client_worker(void *v)
 	struct timespec s, e;
 	char *repbuf = NULL;
 	int replen;
+	const int repeat = 1;
 
 #ifdef THUNDERING_HERD
 	pthread_barrier_wait(&thundering_herd);
 #endif
 
-	if (debug) printf("client: sending req: [%s]\n", cw->req);
+	int i;
+	for (i = 0; i < repeat; i++) {
+		if (debug) printf("client: sending req: [%s]\n", cw->req);
 
-	clock_gettime(CLOCK_MONOTONIC, &s);
+		clock_gettime(CLOCK_MONOTONIC, &s);
 
-	if (nn_send(cw->s, cw->req, strlen(cw->req), 0) != (int)strlen(cw->req))
-		err(1, "nn_send");
-	if ((replen = nn_recv(cw->s, &repbuf, NN_MSG, 0)) < 0)
-		err(1, "nn_recv");
+		if (nn_send(cw->s, cw->req, strlen(cw->req), 0) != (int)strlen(cw->req))
+			err(1, "nn_send");
+		if ((replen = nn_recv(cw->s, &repbuf, NN_MSG, 0)) < 0)
+			err(1, "nn_recv");
 
-	clock_gettime(CLOCK_MONOTONIC, &e);
+		clock_gettime(CLOCK_MONOTONIC, &e);
 
-	e.tv_sec -= s.tv_sec;
-	if ((e.tv_nsec -= s.tv_nsec) < 0) {
-		e.tv_nsec += 1000000000;
-		e.tv_sec--;
+		e.tv_sec -= s.tv_sec;
+		if ((e.tv_nsec -= s.tv_nsec) < 0) {
+			e.tv_nsec += 1000000000;
+			e.tv_sec--;
+		}
+
+		double t = ((double)e.tv_sec * 1000000000.0 + (double)e.tv_nsec) / 1000000000.0;
+
+		pthread_mutex_lock(&count_mtx);
+		if (e.tv_sec) {
+			printf("client req took %f\n", t);
+			slow_time += t;
+			slow_cnt++;
+			/* __sync_fetch_and_add(&slow_time, t); doesn't work, so we need a lock. */
+		} else {
+			fast_time += t;
+			fast_cnt++;
+		}
+		pthread_mutex_unlock(&count_mtx);
+
+		if (debug) printf("client: received reply: [%.*s]\n", replen, repbuf);
+		nn_freemsg(repbuf);
 	}
-
-	double t = ((double)e.tv_sec * 1000000000.0 + (double)e.tv_nsec) / 1000000000.0;
-
-	pthread_mutex_lock(&count_mtx);
-	if (e.tv_sec) {
-		printf("client req took %f\n", t);
-		slow_time += t;
-		slow_cnt++;
-		/* __sync_fetch_and_add(&slow_time, t); doesn't work, so we need a lock. */
-	} else {
-		fast_time += t;
-		fast_cnt++;
-	}
-	pthread_mutex_unlock(&count_mtx);
-
-	if (debug) printf("client: received reply: [%.*s]\n", replen, repbuf);
-	nn_freemsg(repbuf);
 
 	nn_shutdown(cw->s, 0);
 
