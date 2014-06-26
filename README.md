@@ -100,8 +100,8 @@ I'm evaluating nanomsg as a replacement protocol for two internal
 services we run. We desperately need to modernize certain things in
 how we talk to our services and as part of it I've decided to find
 some ready made solution instead of rolling our own. Our own protocols
-do what they need, are scalable and fast, but it's not really our core
-business to polish network protocols.
+do what they need, are low latency and fast, but it's not really our
+core business to polish network protocols.
 
 So far nanomsg looks like almost what we need. We would use a
 relatively simple REQ/REP model for both the services we run and can
