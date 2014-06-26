@@ -76,13 +76,14 @@ total time we've been blocking the client(s) is 418 seconds more than
 we should have. This is not good.
 
 The workaround is to simply reduce the receive buffer on the worker
-threads to one byte. Somehow this makes the slow worker thread queue
-process three requests (first one I understand it's the one it starts
+threads to one byte. Somehow this makes the slow worker thread process
+three requests. First one I understand it's the one it starts
 processing immediately, second one I understand, it's the one that's
 queued in the "exactly one message may be buffered in addition to the
 data in the receive buffer", but where does the third come from? It
 won't fit in the buffer, because the request is three bytes and the
-receive buffer is set to 1. Is it queued in the send buffer?
+receive buffer is set to 1. Is it queued in the send buffer? And why
+can't I set the receive buffer to 0 bytes?
 
 ### What did I miss? ###
 
