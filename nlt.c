@@ -106,6 +106,12 @@ struct cw {
 	char *req;
 };
 
+#define THUNDERING_HERD
+#ifdef THUNDERING_HERD
+/* Just for fun, we want all our clients to start at the "same time". This isn't strictly necessary, but it's fun. This code can be disabled. */
+pthread_barrier_t thundering_herd;
+#endif
+
 static void *
 client_worker(void *v)
 {
@@ -113,6 +119,10 @@ client_worker(void *v)
 	struct timespec s, e;
 	char *repbuf = NULL;
 	int replen;
+
+#ifdef THUNDERING_HERD
+	pthread_barrier_wait(&thundering_herd);
+#endif
 
 	if (debug) printf("client: sending req: [%s]\n", cw->req);
 
@@ -151,6 +161,10 @@ client(int argc, char **argv)
 	pthread_t thr[cnt];
 	int i;
 
+#ifdef THUNDERING_HERD
+	pthread_barrier_init(&thundering_herd, NULL, cnt + 1);
+#endif
+
 	for (i = 0; i < cnt; i++) {
 		struct cw *cw = calloc(1, sizeof(*cw));
 
@@ -162,6 +176,10 @@ client(int argc, char **argv)
 		asprintf(&cw->req, "xx%d", i);
 		pthread_create(&thr[i], NULL, client_worker, cw);
 	}
+
+#ifdef THUNDERING_HERD
+	pthread_barrier_wait(&thundering_herd);
+#endif
 
 	for (i = 0; i < 100; i++) {
 		void *r;
