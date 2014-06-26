@@ -142,31 +142,34 @@ worse. A waiting client uses a lot of memory, which slows request
 processing even more which quickly propagates up the stack and leads
 to choking frontend servers and the whole house of cards falls down.
 This is not an imagined scenario. Logging shows that some of our users
-hit this situation several times per day. Strictly speaking this isn't
-necessarily just the requests that are expensive, but can also be caused
-by the paging behavior of the machines they run on since we're processing
-a lot of data mapped with `mmap` and the operating system can sometimes
-evict random pages that we actually need.
+hit this situation several times per day. Strictly speaking it isn't
+necessarily just the requests that are expensive, but can also be
+caused by the paging behavior of the machines they run on since we're
+processing a lot of data mapped with `mmap` and the operating system
+can sometimes evict random pages that we end up actually needing.
 
 We can't handle this with client side timeouts because the client
 rarely knows which requests will be CPU melters and which ones will be
 handled by a simple precomputed response. So any reasonable client
-timeout must be at least a few seconds (with manual tuning of the
-requests that we know can take up to several minutes), which means
-unreasonable amount of request queueing before we detect that a server
-is busy.
+timeout must be at least a few seconds (plus manual tuning of the
+requests that we know can take up to several minutes), which would
+lead to unreasonable amount of request queueing before we detect that
+a server is too busy and we should switch to another one. 
 
 The solution for it we have in our home-brew protocols is to always
 reserve a high priority worker thread that handles requests when all
 other worker threads are busy. It reads the request, throws it away
-and responds "busy, go away" (almost literally). Then there's in the
-clients that makes them X% less likely to send a request to a server
-if the last response from it was "go away".  But even the simplest
-strategy of "resend the request to any other randomly picked server"
-works adequately. By spreading the load this way we reduce the
-probability of having all CPUs busy at the same time from once an hour
-to once a year which is good enough. Random is quite important here
-because when doing this round-robin just one small hiccup on one
-server means that the next server in the list gets hit with two fire
-hoses of requests, overloads, returns "go away", the next server in
-line gets all the firehoses and we end up with oscilating servers.
+and responds "busy, go away" (almost literally). Then there's logic in
+the clients that makes them X% (90-99% usually) less likely to send a
+request to a server if the last response from it was "go away". The
+occasional request still gets through and if the server has stopped
+being busy it is put back into the normal load balancing schedule.
+But even the simplest strategy of "resend the request to any other
+randomly picked server" works good enough. By spreading the load this
+way we reduce the probability of having all CPUs busy at the same time
+from once an hour to once a year which is good enough. Random is quite
+important here because when doing this round-robin just one small
+hiccup on one server means that the next server in the list gets hit
+with two fire hoses of requests, overloads, returns "go away", the
+next server in line gets all the firehoses and we end up with
+oscilating servers.
