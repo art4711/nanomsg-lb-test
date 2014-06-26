@@ -159,7 +159,7 @@ client(int argc, char **argv)
 		if (nn_connect(cw->s, argv[0]) < 0)
 			err(1, "nn_connect");
 
-		asprintf(&cw->req, "%d", i);
+		asprintf(&cw->req, "xx%d", i);
 		pthread_create(&thr[i], NULL, client_worker, cw);
 	}
 
